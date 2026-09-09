@@ -1,15 +1,37 @@
+import os
 import sqlite3
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from zoneinfo import ZoneInfo
 
 
+try:
+    import psycopg
+    from psycopg.rows import dict_row
+except ImportError:
+    psycopg = None
+    dict_row = None
+
+
 # ============================================================
-# DATABASE PATH
+# DATABASE CONFIGURATION
 # ============================================================
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATABASE_PATH = BASE_DIR / "nova.db"
+
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    "sqlite:///nova.db"
+)
+
+# Render may provide postgres:// URLs.
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace(
+        "postgres://",
+        "postgresql://",
+        1
+    )
 
 
 class Database:
@@ -18,22 +40,50 @@ class Database:
     # INITIALIZATION
     # ========================================================
 
-    def __init__(
-        self,
-        database_path=DATABASE_PATH
-    ):
+    def __init__(self, database_path=DATABASE_PATH):
+
+        self.database_url = DATABASE_URL
+
+        if self.database_url.startswith(
+            ("postgresql://", "postgresql+")
+        ):
+            self.backend = "postgresql"
+
+        else:
+            self.backend = "sqlite"
+
         self.database_path = str(
             database_path
         )
 
-        self.initialize()
+        if self.backend == "postgresql":
+            if psycopg is None:
+                raise RuntimeError(
+                    "psycopg is required for PostgreSQL."
+                )
 
+        self.initialize()
 
     # ========================================================
     # CONNECTION
     # ========================================================
 
     def _connect(self):
+
+        # ----------------------------------------------------
+        # POSTGRESQL
+        # ----------------------------------------------------
+
+        if self.backend == "postgresql":
+
+            return psycopg.connect(
+                self.database_url,
+                row_factory=dict_row
+            )
+
+        # ----------------------------------------------------
+        # SQLITE
+        # ----------------------------------------------------
 
         connection = sqlite3.connect(
             self.database_path,
@@ -48,7 +98,6 @@ class Database:
 
         return connection
 
-
     # ========================================================
     # INITIALIZE DATABASE
     # ========================================================
@@ -61,81 +110,86 @@ class Database:
             # CONVERSATIONS
             # ------------------------------------------------
 
-            connection.execute(
-                """
-                CREATE TABLE IF NOT EXISTS conversations (
-                    id TEXT PRIMARY KEY,
-                    title TEXT,
-                    created_at TEXT NOT NULL,
-                    updated_at TEXT NOT NULL
-                )
-                """
-            )
-
-
-            # ------------------------------------------------
-            # MESSAGES
-            # ------------------------------------------------
-
-            connection.execute(
-                """
-                CREATE TABLE IF NOT EXISTS messages (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    conversation_id TEXT NOT NULL,
-                    role TEXT NOT NULL,
-                    content TEXT NOT NULL,
-                    created_at TEXT NOT NULL,
-
-                    FOREIGN KEY (
-                        conversation_id
-                    )
-                    REFERENCES conversations(id)
-                    ON DELETE CASCADE
-                )
-                """
-            )
-
-
-            # ------------------------------------------------
-            # QUOTA USAGE
-            # ------------------------------------------------
-
-            connection.execute(
-                """
-                CREATE TABLE IF NOT EXISTS quota_usage (
-                    date TEXT PRIMARY KEY,
-                    requests_used INTEGER NOT NULL DEFAULT 0,
-                    updated_at TEXT NOT NULL
-                )
-                """
-            )
-
-
-            # ------------------------------------------------
-            # CONVERSATION COLUMN MIGRATION
-            # ------------------------------------------------
-
-            columns = connection.execute(
-                "PRAGMA table_info(conversations)"
-            ).fetchall()
-
-            column_names = {
-                column["name"]
-                for column in columns
-            }
-
-            if "title" not in column_names:
+            if self.backend == "postgresql":
 
                 connection.execute(
                     """
-                    ALTER TABLE conversations
-                    ADD COLUMN title TEXT
+                    CREATE TABLE IF NOT EXISTS conversations (
+                        id TEXT PRIMARY KEY,
+                        title TEXT,
+                        created_at TEXT NOT NULL,
+                        updated_at TEXT NOT NULL
+                    )
                     """
                 )
 
+                connection.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS messages (
+                        id BIGSERIAL PRIMARY KEY,
+                        conversation_id TEXT NOT NULL,
+                        role TEXT NOT NULL,
+                        content TEXT NOT NULL,
+                        created_at TEXT NOT NULL,
+
+                        FOREIGN KEY (conversation_id)
+                        REFERENCES conversations(id)
+                        ON DELETE CASCADE
+                    )
+                    """
+                )
+
+                connection.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS quota_usage (
+                        date TEXT PRIMARY KEY,
+                        requests_used INTEGER NOT NULL DEFAULT 0,
+                        updated_at TEXT NOT NULL
+                    )
+                    """
+                )
+
+            else:
+
+                connection.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS conversations (
+                        id TEXT PRIMARY KEY,
+                        title TEXT,
+                        created_at TEXT NOT NULL,
+                        updated_at TEXT NOT NULL
+                    )
+                    """
+                )
+
+                connection.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS messages (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        conversation_id TEXT NOT NULL,
+                        role TEXT NOT NULL,
+                        content TEXT NOT NULL,
+                        created_at TEXT NOT NULL,
+
+                        FOREIGN KEY (conversation_id)
+                        REFERENCES conversations(id)
+                        ON DELETE CASCADE
+                    )
+                    """
+                )
+
+                connection.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS quota_usage (
+                        date TEXT PRIMARY KEY,
+                        requests_used INTEGER NOT NULL DEFAULT 0,
+                        updated_at TEXT NOT NULL
+                    )
+                    """
+                )
 
             # ------------------------------------------------
-            # MESSAGES INDEX
+            # INDEXES
             # ------------------------------------------------
 
             connection.execute(
@@ -146,7 +200,6 @@ class Database:
                 """
             )
 
-
             connection.execute(
                 """
                 CREATE INDEX IF NOT EXISTS
@@ -154,11 +207,6 @@ class Database:
                 ON messages(created_at)
                 """
             )
-
-
-            # ------------------------------------------------
-            # CONVERSATIONS INDEX
-            # ------------------------------------------------
 
             connection.execute(
                 """
@@ -168,9 +216,7 @@ class Database:
                 """
             )
 
-
             connection.commit()
-
 
     # ========================================================
     # CREATE CONVERSATION
@@ -188,27 +234,50 @@ class Database:
 
         with self._connect() as connection:
 
-            connection.execute(
-                """
-                INSERT OR IGNORE INTO conversations
-                (
-                    id,
-                    title,
-                    created_at,
-                    updated_at
+            if self.backend == "postgresql":
+
+                connection.execute(
+                    """
+                    INSERT INTO conversations
+                    (
+                        id,
+                        title,
+                        created_at,
+                        updated_at
+                    )
+                    VALUES (%s, %s, %s, %s)
+                    ON CONFLICT (id) DO NOTHING
+                    """,
+                    (
+                        conversation_id,
+                        title,
+                        now,
+                        now
+                    )
                 )
-                VALUES (?, ?, ?, ?)
-                """,
-                (
-                    conversation_id,
-                    title,
-                    now,
-                    now
+
+            else:
+
+                connection.execute(
+                    """
+                    INSERT OR IGNORE INTO conversations
+                    (
+                        id,
+                        title,
+                        created_at,
+                        updated_at
+                    )
+                    VALUES (?, ?, ?, ?)
+                    """,
+                    (
+                        conversation_id,
+                        title,
+                        now,
+                        now
+                    )
                 )
-            )
 
             connection.commit()
-
 
     # ========================================================
     # UPDATE CONVERSATION TITLE
@@ -220,16 +289,10 @@ class Database:
         title
     ):
 
-        title = str(
-            title
-        ).strip()
+        title = str(title).strip()
 
         if len(title) > 45:
-
-            title = (
-                title[:45].rstrip()
-                + "..."
-            )
+            title = title[:45].rstrip() + "..."
 
         now = datetime.now(
             timezone.utc
@@ -237,13 +300,19 @@ class Database:
 
         with self._connect() as connection:
 
+            placeholder = (
+                "%s"
+                if self.backend == "postgresql"
+                else "?"
+            )
+
             connection.execute(
-                """
+                f"""
                 UPDATE conversations
                 SET
-                    title = ?,
-                    updated_at = ?
-                WHERE id = ?
+                    title = {placeholder},
+                    updated_at = {placeholder}
+                WHERE id = {placeholder}
                 """,
                 (
                     title,
@@ -253,7 +322,6 @@ class Database:
             )
 
             connection.commit()
-
 
     # ========================================================
     # ADD MESSAGE
@@ -270,16 +338,10 @@ class Database:
             conversation_id
         ).strip()
 
-        role = str(
-            role
-        ).strip()
-
-        content = str(
-            content
-        ).strip()
+        role = str(role).strip()
+        content = str(content).strip()
 
         if not conversation_id:
-
             raise ValueError(
                 "Conversation ID cannot be empty."
             )
@@ -288,34 +350,33 @@ class Database:
             "user",
             "assistant"
         ):
-
             raise ValueError(
                 "Role must be 'user' or 'assistant'."
             )
 
         if not content:
-
             raise ValueError(
                 "Message content cannot be empty."
             )
-
-
-        # Make sure conversation exists.
 
         self.create_conversation(
             conversation_id
         )
 
-
         now = datetime.now(
             timezone.utc
         ).isoformat()
 
-
         with self._connect() as connection:
 
+            placeholder = (
+                "%s"
+                if self.backend == "postgresql"
+                else "?"
+            )
+
             connection.execute(
-                """
+                f"""
                 INSERT INTO messages
                 (
                     conversation_id,
@@ -323,7 +384,12 @@ class Database:
                     content,
                     created_at
                 )
-                VALUES (?, ?, ?, ?)
+                VALUES (
+                    {placeholder},
+                    {placeholder},
+                    {placeholder},
+                    {placeholder}
+                )
                 """,
                 (
                     conversation_id,
@@ -333,12 +399,11 @@ class Database:
                 )
             )
 
-
             connection.execute(
-                """
+                f"""
                 UPDATE conversations
-                SET updated_at = ?
-                WHERE id = ?
+                SET updated_at = {placeholder}
+                WHERE id = {placeholder}
                 """,
                 (
                     now,
@@ -346,9 +411,7 @@ class Database:
                 )
             )
 
-
             connection.commit()
-
 
     # ========================================================
     # GET MESSAGES
@@ -367,8 +430,14 @@ class Database:
 
         with self._connect() as connection:
 
+            placeholder = (
+                "%s"
+                if self.backend == "postgresql"
+                else "?"
+            )
+
             rows = connection.execute(
-                """
+                f"""
                 SELECT
                     id,
                     conversation_id,
@@ -376,9 +445,9 @@ class Database:
                     content,
                     created_at
                 FROM messages
-                WHERE conversation_id = ?
+                WHERE conversation_id = {placeholder}
                 ORDER BY id DESC
-                LIMIT ?
+                LIMIT {placeholder}
                 """,
                 (
                     conversation_id,
@@ -386,25 +455,18 @@ class Database:
                 )
             ).fetchall()
 
-
-        rows = list(
-            reversed(rows)
-        )
-
+        rows = list(reversed(rows))
 
         return [
             {
                 "id": row["id"],
-                "conversation_id":
-                    row["conversation_id"],
+                "conversation_id": row["conversation_id"],
                 "role": row["role"],
                 "content": row["content"],
-                "created_at":
-                    row["created_at"]
+                "created_at": row["created_at"]
             }
             for row in rows
         ]
-
 
     # ========================================================
     # GET SINGLE CONVERSATION
@@ -417,29 +479,31 @@ class Database:
 
         with self._connect() as connection:
 
+            placeholder = (
+                "%s"
+                if self.backend == "postgresql"
+                else "?"
+            )
+
             row = connection.execute(
-                """
+                f"""
                 SELECT
                     id,
                     title,
                     created_at,
                     updated_at
                 FROM conversations
-                WHERE id = ?
+                WHERE id = {placeholder}
                 """,
                 (
                     conversation_id,
                 )
             ).fetchone()
 
-
         if row is None:
-
             return None
 
-
         return dict(row)
-
 
     # ========================================================
     # GET ALL CONVERSATIONS
@@ -457,8 +521,14 @@ class Database:
 
         with self._connect() as connection:
 
+            placeholder = (
+                "%s"
+                if self.backend == "postgresql"
+                else "?"
+            )
+
             rows = connection.execute(
-                """
+                f"""
                 SELECT
                     c.id,
                     c.title,
@@ -486,21 +556,18 @@ class Database:
 
                 ORDER BY c.updated_at DESC
 
-                LIMIT ?
+                LIMIT {placeholder}
                 """,
                 (
                     limit,
                 )
             ).fetchall()
 
-
         conversations = []
-
 
         for row in rows:
 
             item = dict(row)
-
 
             if not item["title"]:
 
@@ -516,22 +583,13 @@ class Database:
                 )
 
                 if len(title) > 45:
-
-                    title = (
-                        title[:45].rstrip()
-                        + "..."
-                    )
+                    title = title[:45].rstrip() + "..."
 
                 item["title"] = title
 
-
-            conversations.append(
-                item
-            )
-
+            conversations.append(item)
 
         return conversations
-
 
     # ========================================================
     # SEARCH MESSAGES
@@ -543,14 +601,10 @@ class Database:
         limit=30
     ):
 
-        query = str(
-            query
-        ).strip()
+        query = str(query).strip()
 
         if not query:
-
             return []
-
 
         limit = max(
             1,
@@ -559,11 +613,22 @@ class Database:
 
         pattern = f"%{query}%"
 
-
         with self._connect() as connection:
 
+            placeholder = (
+                "%s"
+                if self.backend == "postgresql"
+                else "?"
+            )
+
+            search_operator = (
+                "ILIKE"
+                if self.backend == "postgresql"
+                else "LIKE"
+            )
+
             rows = connection.execute(
-                """
+                f"""
                 SELECT
                     m.id,
                     m.conversation_id,
@@ -577,11 +642,11 @@ class Database:
                 LEFT JOIN conversations c
                     ON c.id = m.conversation_id
 
-                WHERE m.content LIKE ?
+                WHERE m.content {search_operator} {placeholder}
 
                 ORDER BY m.id DESC
 
-                LIMIT ?
+                LIMIT {placeholder}
                 """,
                 (
                     pattern,
@@ -589,9 +654,7 @@ class Database:
                 )
             ).fetchall()
 
-
         results = []
-
 
         for row in rows:
 
@@ -604,41 +667,21 @@ class Database:
             )
 
             if len(preview) > 100:
-
-                preview = (
-                    preview[:100]
-                    + "..."
-                )
-
+                preview = preview[:100] + "..."
 
             results.append(
                 {
                     "id": row["id"],
-
-                    "conversation_id":
-                        row["conversation_id"],
-
-                    "role":
-                        row["role"],
-
-                    "preview":
-                        preview,
-
-                    "content":
-                        content,
-
-                    "title":
-                        row["title"]
-                        or "Conversation",
-
-                    "created_at":
-                        row["created_at"]
+                    "conversation_id": row["conversation_id"],
+                    "role": row["role"],
+                    "preview": preview,
+                    "content": content,
+                    "title": row["title"] or "Conversation",
+                    "created_at": row["created_at"]
                 }
             )
 
-
         return results
-
 
     # ========================================================
     # ANALYTICS
@@ -648,71 +691,64 @@ class Database:
 
         with self._connect() as connection:
 
-            # ------------------------------------------------
-            # BASIC COUNTS
-            # ------------------------------------------------
-
             total_conversations = connection.execute(
                 """
-                SELECT COUNT(*)
+                SELECT COUNT(*) AS value
                 FROM conversations
                 """
-            ).fetchone()[0]
-
+            ).fetchone()["value"]
 
             total_messages = connection.execute(
                 """
-                SELECT COUNT(*)
+                SELECT COUNT(*) AS value
                 FROM messages
                 """
-            ).fetchone()[0]
-
+            ).fetchone()["value"]
 
             user_messages = connection.execute(
                 """
-                SELECT COUNT(*)
+                SELECT COUNT(*) AS value
                 FROM messages
                 WHERE role = 'user'
                 """
-            ).fetchone()[0]
-
+            ).fetchone()["value"]
 
             assistant_messages = connection.execute(
                 """
-                SELECT COUNT(*)
+                SELECT COUNT(*) AS value
                 FROM messages
                 WHERE role = 'assistant'
                 """
-            ).fetchone()[0]
-
+            ).fetchone()["value"]
 
             first_message = connection.execute(
                 """
-                SELECT MIN(created_at)
+                SELECT MIN(created_at) AS value
                 FROM messages
                 """
-            ).fetchone()[0]
-
+            ).fetchone()["value"]
 
             last_message = connection.execute(
                 """
-                SELECT MAX(created_at)
+                SELECT MAX(created_at) AS value
                 FROM messages
                 """
-            ).fetchone()[0]
+            ).fetchone()["value"]
 
-
-            # ------------------------------------------------
-            # DAILY MESSAGE ACTIVITY
-            # ------------------------------------------------
+            if self.backend == "postgresql":
+                date_expression = (
+                    "SUBSTRING(created_at, 1, 10)"
+                )
+            else:
+                date_expression = (
+                    "substr(created_at, 1, 10)"
+                )
 
             daily_rows = connection.execute(
-                """
+                f"""
                 SELECT
-                    substr(created_at, 1, 10) AS date,
-
+                    {date_expression} AS date,
                     COUNT(*) AS total,
-
                     SUM(
                         CASE
                             WHEN role = 'user'
@@ -720,7 +756,6 @@ class Database:
                             ELSE 0
                         END
                     ) AS user_messages,
-
                     SUM(
                         CASE
                             WHEN role = 'assistant'
@@ -728,136 +763,69 @@ class Database:
                             ELSE 0
                         END
                     ) AS assistant_messages
-
                 FROM messages
-
-                GROUP BY
-                    substr(created_at, 1, 10)
-
+                GROUP BY {date_expression}
                 ORDER BY date ASC
                 """
             ).fetchall()
-
-
-            # ------------------------------------------------
-            # CONVERSATION ACTIVITY
-            # ------------------------------------------------
 
             conversation_rows = connection.execute(
-                """
+                f"""
                 SELECT
-                    substr(created_at, 1, 10) AS date,
+                    {date_expression} AS date,
                     COUNT(*) AS conversations
-
                 FROM conversations
-
-                GROUP BY
-                    substr(created_at, 1, 10)
-
+                GROUP BY {date_expression}
                 ORDER BY date ASC
                 """
             ).fetchall()
 
-
-        # ----------------------------------------------------
-        # FORMAT DAILY ACTIVITY
-        # ----------------------------------------------------
-
         daily_activity = []
-
 
         for row in daily_rows:
 
             daily_activity.append(
                 {
-                    "date":
-                        row["date"],
-
-                    "total":
-                        row["total"] or 0,
-
-                    "user":
-                        row["user_messages"] or 0,
-
-                    "assistant":
-                        row["assistant_messages"] or 0
+                    "date": row["date"],
+                    "total": row["total"] or 0,
+                    "user": row["user_messages"] or 0,
+                    "assistant": row["assistant_messages"] or 0
                 }
             )
 
-
-        # ----------------------------------------------------
-        # FORMAT CONVERSATION ACTIVITY
-        # ----------------------------------------------------
-
         conversation_activity = []
-
 
         for row in conversation_rows:
 
             conversation_activity.append(
                 {
-                    "date":
-                        row["date"],
-
-                    "conversations":
-                        row["conversations"] or 0
+                    "date": row["date"],
+                    "conversations": row["conversations"] or 0
                 }
             )
 
-
-        # ----------------------------------------------------
-        # ROLE DISTRIBUTION
-        # ----------------------------------------------------
-
         role_distribution = [
-
             {
                 "role": "User",
                 "count": user_messages
             },
-
             {
                 "role": "NOVA",
                 "count": assistant_messages
             }
-
         ]
 
-
-        # ----------------------------------------------------
-        # RETURN
-        # ----------------------------------------------------
-
         return {
-
-            "total_conversations":
-                total_conversations,
-
-            "total_messages":
-                total_messages,
-
-            "user_messages":
-                user_messages,
-
-            "assistant_messages":
-                assistant_messages,
-
-            "first_activity":
-                first_message,
-
-            "last_activity":
-                last_message,
-
-            "daily_activity":
-                daily_activity,
-
-            "conversation_activity":
-                conversation_activity,
-
-            "role_distribution":
-                role_distribution
+            "total_conversations": total_conversations,
+            "total_messages": total_messages,
+            "user_messages": user_messages,
+            "assistant_messages": assistant_messages,
+            "first_activity": first_message,
+            "last_activity": last_message,
+            "daily_activity": daily_activity,
+            "conversation_activity": conversation_activity,
+            "role_distribution": role_distribution
         }
-
 
     # ========================================================
     # QUOTA — INDIA DATE
@@ -865,19 +833,11 @@ class Database:
 
     def _quota_date(self):
 
-        """
-        Return today's quota date in IST.
-
-        This means the quota automatically belongs
-        to a new day after 12:00 AM India time.
-        """
-
         india_time = datetime.now(
             ZoneInfo("Asia/Kolkata")
         )
 
         return india_time.date().isoformat()
-
 
     # ========================================================
     # QUOTA — CURRENT IST TIMESTAMP
@@ -885,14 +845,9 @@ class Database:
 
     def _quota_now(self):
 
-        """
-        Return current timestamp in IST.
-        """
-
         return datetime.now(
             ZoneInfo("Asia/Kolkata")
         ).isoformat()
-
 
     # ========================================================
     # QUOTA — GET USAGE
@@ -904,58 +859,45 @@ class Database:
     ):
 
         if date is None:
-
             date = self._quota_date()
-
 
         with self._connect() as connection:
 
+            placeholder = (
+                "%s"
+                if self.backend == "postgresql"
+                else "?"
+            )
+
             row = connection.execute(
-                """
+                f"""
                 SELECT
                     date,
                     requests_used,
                     updated_at
                 FROM quota_usage
-                WHERE date = ?
+                WHERE date = {placeholder}
                 """,
                 (
                     date,
                 )
             ).fetchone()
 
-
         if row is None:
 
             return {
-
-                "date":
-                    date,
-
-                "requests_used":
-                    0,
-
-                "updated_at":
-                    None
-
+                "date": date,
+                "requests_used": 0,
+                "updated_at": None
             }
 
-
         return {
-
-            "date":
-                row["date"],
-
-            "requests_used":
-                int(
-                    row["requests_used"] or 0
-                ),
-
-            "updated_at":
-                row["updated_at"]
-
+            "date": row["date"],
+            "requests_used": int(
+                row["requests_used"] or 0
+            ),
+            "updated_at": row["updated_at"]
         }
-
 
     # ========================================================
     # QUOTA — GET STATUS
@@ -971,59 +913,36 @@ class Database:
             int(daily_limit)
         )
 
-
         usage = self.get_quota_usage()
-
 
         used = int(
             usage["requests_used"]
         )
-
 
         remaining = max(
             daily_limit - used,
             0
         )
 
-
         percentage = 0
 
         if daily_limit > 0:
-
             percentage = round(
                 (
-                    used
-                    / daily_limit
+                    used / daily_limit
                 ) * 100,
                 1
             )
 
-
         return {
-
-            "date":
-                usage["date"],
-
-            "used":
-                used,
-
-            "limit":
-                daily_limit,
-
-            "remaining":
-                remaining,
-
-            "percentage":
-                percentage,
-
-            "available":
-                used < daily_limit,
-
-            "updated_at":
-                usage["updated_at"]
-
+            "date": usage["date"],
+            "used": used,
+            "limit": daily_limit,
+            "remaining": remaining,
+            "percentage": percentage,
+            "available": used < daily_limit,
+            "updated_at": usage["updated_at"]
         }
-
 
     # ========================================================
     # QUOTA — CONSUME REQUEST
@@ -1040,103 +959,94 @@ class Database:
             int(daily_limit)
         )
 
-
         if date is None:
-
             date = self._quota_date()
-
 
         now = self._quota_now()
 
-
         with self._connect() as connection:
 
-            # ------------------------------------------------
-            # GET TODAY'S USAGE
-            # ------------------------------------------------
+            placeholder = (
+                "%s"
+                if self.backend == "postgresql"
+                else "?"
+            )
 
             row = connection.execute(
-                """
-                SELECT
-                    requests_used
+                f"""
+                SELECT requests_used
                 FROM quota_usage
-                WHERE date = ?
+                WHERE date = {placeholder}
                 """,
                 (
                     date,
                 )
             ).fetchone()
 
-
             current_usage = (
-
-                int(
-                    row["requests_used"]
-                    or 0
-                )
-
+                int(row["requests_used"] or 0)
                 if row is not None
-
                 else 0
-
             )
-
-
-            # ------------------------------------------------
-            # LIMIT CHECK
-            # ------------------------------------------------
 
             if current_usage >= daily_limit:
-
                 return False
 
+            new_usage = current_usage + 1
 
-            # ------------------------------------------------
-            # INCREMENT
-            # ------------------------------------------------
+            if self.backend == "postgresql":
 
-            new_usage = (
-                current_usage + 1
-            )
-
-
-            # ------------------------------------------------
-            # INSERT / UPDATE
-            # ------------------------------------------------
-
-            connection.execute(
-                """
-                INSERT INTO quota_usage
-                (
-                    date,
-                    requests_used,
-                    updated_at
+                connection.execute(
+                    """
+                    INSERT INTO quota_usage
+                    (
+                        date,
+                        requests_used,
+                        updated_at
+                    )
+                    VALUES (%s, %s, %s)
+                    ON CONFLICT (date)
+                    DO UPDATE SET
+                        requests_used =
+                            EXCLUDED.requests_used,
+                        updated_at =
+                            EXCLUDED.updated_at
+                    """,
+                    (
+                        date,
+                        new_usage,
+                        now
+                    )
                 )
-                VALUES (?, ?, ?)
 
-                ON CONFLICT(date)
+            else:
 
-                DO UPDATE SET
-
-                    requests_used =
-                        excluded.requests_used,
-
-                    updated_at =
-                        excluded.updated_at
-                """,
-                (
-                    date,
-                    new_usage,
-                    now
+                connection.execute(
+                    """
+                    INSERT INTO quota_usage
+                    (
+                        date,
+                        requests_used,
+                        updated_at
+                    )
+                    VALUES (?, ?, ?)
+                    ON CONFLICT(date)
+                    DO UPDATE SET
+                        requests_used =
+                            excluded.requests_used,
+                        updated_at =
+                            excluded.updated_at
+                    """,
+                    (
+                        date,
+                        new_usage,
+                        now
+                    )
                 )
-            )
-
 
             connection.commit()
 
-
         return True
-
 
     # ========================================================
     # QUOTA — CLEAN OLD RECORDS
@@ -1152,35 +1062,32 @@ class Database:
             int(keep_days)
         )
 
-
         cutoff_date = (
-
             datetime.now(
                 ZoneInfo("Asia/Kolkata")
             ).date()
-
-            - timedelta(
-                days=keep_days
-            )
-
+            - timedelta(days=keep_days)
         ).isoformat()
-
 
         with self._connect() as connection:
 
+            placeholder = (
+                "%s"
+                if self.backend == "postgresql"
+                else "?"
+            )
+
             connection.execute(
-                """
+                f"""
                 DELETE FROM quota_usage
-                WHERE date < ?
+                WHERE date < {placeholder}
                 """,
                 (
                     cutoff_date,
                 )
             )
 
-
             connection.commit()
-
 
     # ========================================================
     # DELETE CONVERSATION
@@ -1193,12 +1100,16 @@ class Database:
 
         with self._connect() as connection:
 
-            # Foreign key CASCADE removes messages.
+            placeholder = (
+                "%s"
+                if self.backend == "postgresql"
+                else "?"
+            )
 
             connection.execute(
-                """
+                f"""
                 DELETE FROM conversations
-                WHERE id = ?
+                WHERE id = {placeholder}
                 """,
                 (
                     conversation_id,
@@ -1206,7 +1117,6 @@ class Database:
             )
 
             connection.commit()
-
 
     # ========================================================
     # DATABASE HEALTH CHECK
@@ -1222,30 +1132,45 @@ class Database:
                     "SELECT 1"
                 ).fetchone()
 
+                if self.backend == "postgresql":
 
-                # ------------------------------------------------
-                # VERIFY IMPORTANT TABLES
-                # ------------------------------------------------
+                    rows = connection.execute(
+                        """
+                        SELECT table_name
+                        FROM information_schema.tables
+                        WHERE table_schema = 'public'
+                        AND table_name IN (
+                            'conversations',
+                            'messages',
+                            'quota_usage'
+                        )
+                        """
+                    ).fetchall()
 
-                tables = connection.execute(
-                    """
-                    SELECT name
-                    FROM sqlite_master
-                    WHERE type = 'table'
-                    AND name IN (
-                        'conversations',
-                        'messages',
-                        'quota_usage'
-                    )
-                    """
-                ).fetchall()
+                    table_names = {
+                        row["table_name"]
+                        for row in rows
+                    }
 
+                else:
 
-                table_names = {
-                    row["name"]
-                    for row in tables
-                }
+                    tables = connection.execute(
+                        """
+                        SELECT name
+                        FROM sqlite_master
+                        WHERE type = 'table'
+                        AND name IN (
+                            'conversations',
+                            'messages',
+                            'quota_usage'
+                        )
+                        """
+                    ).fetchall()
 
+                    table_names = {
+                        row["name"]
+                        for row in tables
+                    }
 
                 required_tables = {
                     "conversations",
@@ -1253,14 +1178,11 @@ class Database:
                     "quota_usage"
                 }
 
-
-                return (
-                    required_tables
-                    .issubset(table_names)
+                return required_tables.issubset(
+                    table_names
                 )
 
-
-        except sqlite3.Error as error:
+        except Exception as error:
 
             print(
                 "[NOVA] Database health check failed:",

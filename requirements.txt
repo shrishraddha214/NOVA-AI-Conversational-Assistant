@@ -1,10 +1,7 @@
-Flask==3.1.1
-python-dotenv==1.1.1
-google-genai==1.25.0
-scikit-learn==1.7.1
-spacy==3.8.7
-transformers==4.55.0
-torch==2.7.1
-pandas==2.3.1
-numpy==2.3.2
-plotly==6.2.0
+torch
+transformers
+spacy
+pandas
+numpy
+plotly
+scikit-learn
