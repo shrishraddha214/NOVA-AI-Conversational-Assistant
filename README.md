@@ -1,826 +1,343 @@
-✦ NOVA — Dynamic AI Conversational Assistant
-
-NOVA is a full-stack AI conversational assistant built with Python, Flask, Google Gemini, SQLite, HTML, CSS, and JavaScript.
-
-
-
-It provides an interactive conversational interface with persistent conversations, configurable memory, conversation search, analytics, response regeneration, quota protection, fallback handling, and a responsive frontend.
-
-
-
-📌 Overview
-
-NOVA is designed as a modular AI assistant rather than a simple chatbot interface.
-
-
-
-The application separates its major responsibilities into independent layers:
-
-
-
-Flask Application Layer — handles HTTP requests and API routes
-
-Response Engine — coordinates AI response generation and fallback behavior
-
-Gemini Integration — communicates with Google's Gemini API
-
-Database Layer — manages conversations and messages using SQLite
-
-Frontend Layer — provides the interactive chat interface
-
-Configuration Layer — manages application configuration and environment variables
-
-Quota Management — tracks and controls AI request usage
-
-✨ Features
-
-🤖 AI Conversation
-
-AI-powered conversational responses using Google Gemini
-
-Multi-turn conversations
-
-Configurable conversation history
-
-Message validation and length limits
-
-User-friendly handling of AI/API failures
-
-🧠 Conversation Memory
-
-NOVA maintains conversation context using previously stored messages.
-
-
-
-Users can enable or disable conversation memory through the Settings interface.
-
-
-
-When memory is enabled, relevant previous messages are retrieved and passed to the response engine.
-
-
-
-💬 Conversation Management
-
-Create new conversations
-
-Automatically generate conversation titles
-
-View recent conversations
-
-Reopen previous conversations
-
-Delete conversations
-
-Persist the active conversation ID in browser storage
-
-🔎 Conversation Search
-
-NOVA provides search across stored messages.
-
-
-
-Search results can include:
-
-
-
-Matching message content
-
-Message role
-
-Conversation title
-
-Conversation ID
-
-Timestamp
-
-Message preview
-
-Search is handled through the backend database layer and exposed through the search API.
-
-
-
-📊 Analytics
-
-NOVA provides application-level usage analytics, including:
-
-
-
-Total conversations
-
-Total messages
-
-User messages
-
-Assistant messages
-
-First recorded activity
-
-Latest recorded activity
-
-Daily message activity
-
-Conversation activity
-
-User/NOVA message distribution
-
-🔄 Regenerate Responses
-
-Users can regenerate an individual NOVA response.
-
-
-
-The frontend associates assistant responses with their corresponding user messages so that the correct prompt can be regenerated.
-
-
-
-📋 Copy Responses
-
-AI responses include a copy action so users can quickly copy generated content.
-
-
-
-🎨 Theme Support
-
-NOVA includes a theme toggle for switching the appearance of the chat interface.
-
-
-
-⚙️ Settings
-
-The Settings interface provides controls for:
-
-
-
-Conversation memory
-
-AI analysis display
-
-🛡️ Error \& Quota Handling
-
-NOVA handles common AI service and application failures, including:
-
-
-
-API authentication errors
-
-Rate-limit and quota errors
-
-Server connection failures
-
-Empty AI responses
-
-Invalid requests
-
-Message validation errors
-
-The application also tracks AI usage and provides quota information through a dedicated API endpoint.
-
-
-
-📸 Screenshots
-
-Main Chat Interface
-
-NOVA Chat Interface
-
-
-
-Search
-
-NOVA Search
-
-
-
-Analytics
-
-NOVA Analytics
-
-
-
-🏗️ Architecture
-
-&#x20;                        ┌──────────────────────┐
-
-&#x20;                        │      User / Browser  │
-
-&#x20;                        └──────────┬───────────┘
-
-&#x20;                                   │
-
-&#x20;                                   ▼
-
-&#x20;                        ┌──────────────────────┐
-
-&#x20;                        │    HTML / CSS / JS   │
-
-&#x20;                        │       Frontend       │
-
-&#x20;                        └──────────┬───────────┘
-
-&#x20;                                   │
-
-&#x20;                             HTTP / JSON
-
-&#x20;                                   │
-
-&#x20;                                   ▼
-
-&#x20;                        ┌──────────────────────┐
-
-&#x20;                        │       Flask          │
-
-&#x20;                        │     Application      │
-
-&#x20;                        └──────────┬───────────┘
-
-&#x20;                                   │
-
-&#x20;                  ┌────────────────┼────────────────┐
-
-&#x20;                  │                │                │
-
-&#x20;                  ▼                ▼                ▼
-
-&#x20;         ┌────────────────┐ ┌──────────────┐ ┌──────────────┐
-
-&#x20;         │ Response       │ │ Database     │ │ Configuration│
-
-&#x20;         │ Engine         │ │ Layer        │ │ Layer        │
-
-&#x20;         └───────┬────────┘ └──────┬───────┘ └──────────────┘
-
-&#x20;                 │                 │
-
-&#x20;                 ▼                 ▼
-
-&#x20;         ┌────────────────┐ ┌──────────────┐
-
-&#x20;         │ Google Gemini  │ │    SQLite    │
-
-&#x20;         │      API       │ │   Database   │
-
-&#x20;         └────────────────┘ └──────────────┘
-
-📂 Project Structure
-
-NOVA-AI-Conversational-Assistant/
-
+# NOVA — Dynamic AI Conversational Assistant
+
+> A full-stack AI conversational assistant built with Flask, Google Gemini, JavaScript, and SQLite — designed to provide contextual conversations with persistent chat history, search, analytics, and user controls.
+
+---
+
+## ✨ What is NOVA?
+
+**NOVA** is a dynamic AI conversational assistant that goes beyond a basic chatbot.
+
+It combines an AI response engine with persistent conversation storage, context management, search, analytics, regeneration, and a modern responsive interface.
+
+The project was built to explore how an AI assistant can be designed as a **complete application**, rather than simply connecting a frontend to an LLM API.
+
+---
+
+## 🚀 Key Features
+
+| Feature                | Description                                          |
+| ---------------------- | ---------------------------------------------------- |
+| 🤖 AI Conversations    | Generates responses using Google Gemini              |
+| 🧠 Context & Memory    | Maintains conversation context across messages       |
+| 💾 Persistent History  | Stores conversations and messages in SQLite          |
+| 🔄 Regenerate Response | Regenerate an assistant response when needed         |
+| 🔎 Search              | Search through previously stored conversations       |
+| 📊 Analytics           | View conversation and message activity               |
+| ⚙️ User Controls       | Toggle memory and analysis features                  |
+| 🌙 Theme Support       | Light and dark mode                                  |
+| 📋 Copy Responses      | Copy generated responses directly from the interface |
+| 🛡️ Error Handling     | Fallback responses and API/quota protection          |
+| 📱 Responsive UI       | Designed for desktop and smaller screens             |
+
+---
+
+## 📸 Screenshots
+
+### Main Chat Interface
+
+![Main NOVA Chat Interface](screenshots/Main%20NOVA%20chat%20interface.png)
+
+### Search
+
+![Search Interface](screenshots/Search%20interface.png)
+
+### Analytics
+
+![Analytics Interface](screenshots/Analytical%20interface.png)
+
+---
+
+## 🏗️ Architecture
+
+```text
+                        ┌──────────────────────┐
+                        │      NOVA UI         │
+                        │ HTML / CSS / JS      │
+                        └──────────┬───────────┘
+                                   │
+                                   ▼
+                        ┌──────────────────────┐
+                        │      Flask API       │
+                        │       app.py         │
+                        └──────────┬───────────┘
+                                   │
+                    ┌──────────────┴──────────────┐
+                    ▼                             ▼
+          ┌──────────────────┐          ┌──────────────────┐
+          │ Response Engine  │          │    Database      │
+          │ Context / Gemini │          │ SQLite / History │
+          └────────┬─────────┘          └──────────────────┘
+                   │
+                   ▼
+          ┌──────────────────┐
+          │ Google Gemini API│
+          └──────────────────┘
+```
+
+### Request Flow
+
+```text
+User Message
+     ↓
+Flask API
+     ↓
+Context Retrieval
+     ↓
+Quota / Request Checks
+     ↓
+Gemini Response Generation
+     ↓
+Response Processing
+     ↓
+Database Persistence
+     ↓
+Frontend Response
+```
+
+---
+
+## 🧩 Project Structure
+
+```text
+NOVA — Dynamic AI Conversational Assistant/
 │
-
 ├── app.py
-
 ├── config.py
-
 ├── requirements.txt
-
 ├── .env.example
-
-├── .gitignore
-
 │
-
 ├── chatbot/
-
 │   ├── context.py
-
 │   ├── fallback.py
-
 │   ├── gemini.py
-
-│   ├── quota\_guard.py
-
-│   └── response\_engine.py
-
+│   ├── quota_guard.py
+│   └── response_engine.py
 │
-
 ├── database/
-
 │   └── db.py
-
 │
-
+├── templates/
+│   └── index.html
+│
 ├── static/
-
 │   ├── css/
-
 │   │   └── style.css
-
 │   └── js/
-
 │       └── app.js
-
 │
+└── screenshots/
+    ├── Main NOVA chat interface.png
+    ├── Search interface.png
+    └── Analytical interface.png
+```
 
-└── templates/
+---
 
-&#x20;   └── index.html
+## 🛠️ Tech Stack
 
-Main Components
+### Backend
 
-Component	Responsibility
+* Python
+* Flask
+* SQLite
 
-app.py	Flask application and REST API routes
+### AI
 
-config.py	Application configuration
+* Google Gemini API
+* Context-aware response generation
 
-chatbot/gemini.py	Gemini API integration
+### Frontend
 
-chatbot/response\_engine.py	Response generation orchestration
+* HTML5
+* CSS3
+* Vanilla JavaScript
 
-chatbot/context.py	Conversation context handling
+### Development
 
-chatbot/fallback.py	Fallback response handling
+* Git & GitHub
+* Python virtual environment
+* REST API architecture
 
-chatbot/quota\_guard.py	AI request quota protection
+---
 
-database/db.py	SQLite database operations
+## 🔌 API Endpoints
 
-templates/index.html	Main application interface
+| Endpoint                  | Method   | Purpose                                    |
+| ------------------------- | -------- | ------------------------------------------ |
+| `/api/chat`               | `POST`   | Send a message and generate an AI response |
+| `/api/conversations`      | `GET`    | Retrieve conversation history              |
+| `/api/conversations/<id>` | `GET`    | Retrieve a specific conversation           |
+| `/api/conversations/<id>` | `DELETE` | Delete a conversation                      |
+| `/api/search`             | `GET`    | Search stored messages                     |
+| `/api/analytics`          | `GET`    | Retrieve usage analytics                   |
+| `/health`                 | `GET`    | Application health check                   |
 
-static/js/app.js	Frontend application logic
+---
 
-static/css/style.css	UI styling
+## ⚙️ Getting Started
 
-requirements.txt	Python dependencies
+### 1. Clone the repository
 
-🔌 API Endpoints
-
-Application
-
-Method	Endpoint	Purpose
-
-GET	/	Serves the NOVA interface
-
-Chat
-
-Method	Endpoint	Purpose
-
-POST	/api/chat	Generate an AI response
-
-The chat API supports conversation IDs, memory configuration, analysis configuration, and response regeneration.
-
-
-
-Conversations
-
-Method	Endpoint	Purpose
-
-GET	/api/conversations	Retrieve recent conversations
-
-GET	/api/conversations/<conversation\_id>	Retrieve a conversation
-
-DELETE	/api/conversations/<conversation\_id>	Delete a conversation
-
-Search
-
-Method	Endpoint	Purpose
-
-GET	/api/search?q=<query>	Search stored messages
-
-Analytics
-
-Method	Endpoint	Purpose
-
-GET	/api/analytics	Retrieve application analytics
-
-Quota
-
-Method	Endpoint	Purpose
-
-GET	/api/quota	Retrieve current AI quota information
-
-🛠️ Tech Stack
-
-Backend
-
-Python
-
-Flask
-
-REST-style JSON APIs
-
-AI
-
-Google Gemini API
-
-Modular response-generation architecture
-
-Fallback handling
-
-Quota protection
-
-Database
-
-SQLite
-
-Conversation persistence
-
-Message storage
-
-Search
-
-Analytics
-
-Quota tracking
-
-Frontend
-
-HTML5
-
-CSS3
-
-Vanilla JavaScript
-
-Fetch API
-
-Browser Local Storage
-
-⚙️ Installation
-
-1\. Clone the Repository
-
+```bash
 git clone https://github.com/shrishraddha214/NOVA-AI-Conversational-Assistant.git
-
-Navigate into the project:
-
-
-
 cd NOVA-AI-Conversational-Assistant
+```
 
-2\. Create a Virtual Environment
+### 2. Create a virtual environment
 
-Windows
+**Windows**
 
+```bash
+python -m venv venv
+venv\Scripts\activate
+```
 
+**macOS / Linux**
 
-python -m venv .venv
+```bash
+python3 -m venv venv
+source venv/bin/activate
+```
 
-Activate it:
+### 3. Install dependencies
 
-
-
-.venv\\Scripts\\activate
-
-macOS/Linux
-
-
-
-source .venv/bin/activate
-
-3\. Install Dependencies
-
+```bash
 pip install -r requirements.txt
+```
 
-4\. Configure Environment Variables
+### 4. Configure environment variables
 
-Create a .env file in the project root.
+Create a `.env` file using `.env.example` as a template:
 
-
-
-Use .env.example as the template.
-
-
-
-Example:
-
-
-
-SECRET\_KEY=your\_secret\_key\_here
-
-GEMINI\_API\_KEY=your\_gemini\_api\_key\_here
-
-DATABASE\_URL=sqlite:///nova.db
-
+```env
+SECRET_KEY=your_secret_key_here
+GEMINI_API_KEY=your_gemini_api_key_here
+DATABASE_URL=sqlite:///nova.db
 DEBUG=True
+GEMINI_MODEL=gemini-3.6-flash
+MAX_MESSAGE_LENGTH=4000
+MAX_HISTORY_MESSAGES=20
+```
 
-GEMINI\_MODEL=gemini-3.6-flash
+> **Never commit your `.env` file or API keys to GitHub.**
 
-MAX\_MESSAGE\_LENGTH=4000
+### 5. Run the application
 
-MAX\_HISTORY\_MESSAGES=20
-
-Never commit .env or any real API key to GitHub.
-
-
-
-5\. Run NOVA
-
+```bash
 python app.py
+```
 
 Then open:
 
-
-
+```text
 http://127.0.0.1:5000
+```
 
-🔐 Security
+---
 
-Sensitive configuration is kept outside the repository.
+## 🧠 How NOVA Works
 
+When a user sends a message, NOVA:
 
+1. Receives and validates the request through Flask.
+2. Retrieves relevant conversation context.
+3. Applies the configured memory and analysis settings.
+4. Checks request/quota protection.
+5. Sends the request to the Gemini API.
+6. Processes the generated response.
+7. Stores the conversation and response in SQLite.
+8. Returns the result to the frontend.
 
-Environment variables are used for secrets such as API credentials.
+This separation keeps the application modular and makes individual components easier to maintain or replace.
 
+---
 
+## 📊 Analytics
 
-The following are excluded through .gitignore:
+NOVA includes an analytics interface that tracks application usage such as:
 
+* Total conversations
+* Total messages
+* User messages
+* Assistant responses
+* Conversation activity
 
+The analytics layer is connected to the stored conversation data rather than using hard-coded values.
 
-.env
+---
 
-nova.db
+## 🔐 Security & Reliability
 
-\*.sqlite
+The project includes several safeguards:
 
-\*.sqlite3
+* Environment variables for API credentials
+* `.gitignore` protection for secrets and local databases
+* Input length validation
+* API error handling
+* Gemini quota protection
+* Fallback response handling
+* Persistent local database storage
 
-\_\_pycache\_\_/
+For public deployment, additional production security measures such as HTTPS, stronger secret management, authentication, rate limiting, and production-grade database infrastructure should be added.
 
-\*.pyc
+---
 
-.venv/
+## 📌 Current Limitations
 
-venv/
+NOVA is currently designed primarily as a **local/development application**.
 
-A .env.example file is provided as a safe configuration template.
+Some areas that would need additional work for production deployment include:
 
+* User authentication and authorization
+* Production database
+* Distributed rate limiting
+* Cloud deployment
+* Advanced observability and logging
+* More sophisticated long-term memory
+* Automated testing and CI/CD
 
+---
 
-Never commit API keys, passwords, tokens, or private database files.
+## 🔮 Future Improvements
 
+Planned areas for further development include:
 
+* 🔐 User authentication
+* ☁️ Cloud deployment
+* 🧠 Long-term semantic memory
+* 📎 File and document understanding
+* 🎙️ Voice interaction
+* 📈 More advanced analytics visualizations
+* 🧪 Automated testing
+* ⚡ Streaming AI responses
 
-💾 Data Persistence
+---
 
-NOVA uses SQLite for local data persistence.
+## 🎯 Project Objective
 
+The main objective of NOVA was to build a complete AI-powered application while understanding the engineering challenges around:
 
+* LLM API integration
+* Context management
+* Persistent conversations
+* Backend API design
+* Database integration
+* Frontend state management
+* Error and quota handling
+* AI application architecture
 
-The database stores information required for:
+---
 
+## 👩‍💻 Author
 
+**Shraddha Shri**
 
-Conversations
+Computer Science Engineering
+B.Tech — AKTU
 
-Messages
+---
 
-Conversation titles
+## 📄 License
 
-Search
-
-Analytics
-
-Quota tracking
-
-The local database file is intentionally excluded from GitHub.
-
-
-
-When another user clones the project, they can create and use their own local database without receiving the developer's conversation history.
-
-
-
-🧠 Conversation Flow
-
-A typical NOVA request follows this flow:
-
-
-
-User enters message
-
-&#x20;       │
-
-&#x20;       ▼
-
-Frontend validation
-
-&#x20;       │
-
-&#x20;       ▼
-
-POST /api/chat
-
-&#x20;       │
-
-&#x20;       ▼
-
-Flask request validation
-
-&#x20;       │
-
-&#x20;       ▼
-
-Load conversation history
-
-(if memory is enabled)
-
-&#x20;       │
-
-&#x20;       ▼
-
-Response Engine
-
-&#x20;       │
-
-&#x20;       ├──────────────► Quota / fallback handling
-
-&#x20;       │
-
-&#x20;       ▼
-
-Google Gemini
-
-&#x20;       │
-
-&#x20;       ▼
-
-Generated response
-
-&#x20;       │
-
-&#x20;       ▼
-
-Store conversation messages
-
-&#x20;       │
-
-&#x20;       ▼
-
-Return JSON response
-
-&#x20;       │
-
-&#x20;       ▼
-
-Frontend renders response
-
-📊 Analytics Flow
-
-SQLite Messages
-
-&#x20;      │
-
-&#x20;      ▼
-
-Database Analytics Queries
-
-&#x20;      │
-
-&#x20;      ├── Total messages
-
-&#x20;      ├── User messages
-
-&#x20;      ├── Assistant messages
-
-&#x20;      ├── Activity dates
-
-&#x20;      └── Conversation activity
-
-&#x20;      │
-
-&#x20;      ▼
-
-/api/analytics
-
-&#x20;      │
-
-&#x20;      ▼
-
-NOVA Analytics Interface
-
-🧪 Error Handling
-
-NOVA provides application-level handling for common failure conditions, including:
-
-
-
-Empty messages
-
-Messages exceeding the configured length
-
-Invalid requests
-
-Missing conversation IDs
-
-AI service initialization failures
-
-Invalid API responses
-
-Authentication/API key failures
-
-Rate-limit and quota errors
-
-Server connection failures
-
-Empty AI responses
-
-The frontend converts common backend/API failures into user-friendly messages instead of exposing raw backend errors directly.
-
-
-
-🚧 Current Limitations
-
-NOVA is currently designed as a local/full-stack project rather than a production multi-user platform.
-
-
-
-Current limitations include:
-
-
-
-SQLite is used as the local database.
-
-Authentication and user accounts are not implemented.
-
-AI usage depends on the configured Gemini account and quota.
-
-AI responses may occasionally be inaccurate.
-
-Conversation memory is limited to the configured history window.
-
-A valid Gemini API configuration is required for AI responses.
-
-🔮 Future Improvements
-
-Possible future development areas include:
-
-
-
-User authentication and multi-user support
-
-PostgreSQL production database
-
-Streaming AI responses
-
-File/document upload and RAG-based question answering
-
-Web search and grounded responses
-
-Multimodal image input
-
-Advanced analytics dashboards
-
-Message feedback and evaluation metrics
-
-Improved intent classification
-
-Voice input
-
-Production deployment
-
-Automated testing and CI/CD
-
-🎯 Project Objectives
-
-NOVA was developed to demonstrate practical implementation of:
-
-
-
-AI API integration
-
-Conversational application design
-
-Backend API development
-
-Database persistence
-
-Context-aware conversations
-
-Frontend/backend communication
-
-Error and quota handling
-
-Analytics
-
-Modular software architecture
-
-Secure environment-variable configuration
-
-🚀 Project Status
-
-Status: Completed
-
-
-
-The current version includes the core conversational assistant, persistent conversation management, search, analytics, configurable memory, response regeneration, quota handling, fallback handling, and a responsive frontend.
-
-
-
-👩‍💻 Author
-
-Shraddha Shri
-
-
-
-Computer Science Engineering B.Tech
-
-
-
-📄 License
-
-This project is intended for educational, portfolio, and demonstration purposes.
-
-
-
+This project is intended for educational and portfolio purposes.
