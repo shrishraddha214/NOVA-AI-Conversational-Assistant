@@ -337,6 +337,7 @@ Computer Science Engineering
 B.Tech — AKTU
 
 Live Demo : https://nova-ai-o8pp.onrender.com/
+
 Linkedin : shraddha-shri-3a497b294
 
 ---
