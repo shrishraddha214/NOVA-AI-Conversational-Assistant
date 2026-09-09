@@ -336,6 +336,9 @@ The main objective of NOVA was to build a complete AI-powered application while 
 Computer Science Engineering
 B.Tech — AKTU
 
+Live Demo : https://nova-ai-o8pp.onrender.com/
+Linkedin : shraddha-shri-3a497b294
+
 ---
 
 ## 📄 License
