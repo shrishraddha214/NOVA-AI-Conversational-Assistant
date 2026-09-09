@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>NOVA — Dynamic AI Assistant</title>
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='css/style.css') }}"
+    >
+</head>
+
+<body>
+
+<div class="app-shell">
+
+    <!-- =====================================================
+         SIDEBAR
+    ====================================================== -->
+
+    <aside class="sidebar">
+
+        <div class="brand">
+
+            <div class="brand-mark">✦</div>
+
+            <div>
+                <h1>NOVA</h1>
+                <span>AI Conversational Assistant</span>
+            </div>
+
+        </div>
+
+
+        <button
+            class="new-chat-btn"
+            id="newChatBtn"
+            type="button"
+        >
+            <span>＋</span>
+            New conversation
+        </button>
+
+
+        <div class="sidebar-section">
+
+            <div class="section-label">
+                RECENT
+            </div>
+
+            <div
+                class="conversation-list"
+                id="conversationList"
+            >
+                <div class="empty-history">
+                    No conversations yet
+                </div>
+            </div>
+
+        </div>
+
+
+        <div class="sidebar-bottom">
+
+            <button
+                class="sidebar-item"
+                id="analyticsBtn"
+                type="button"
+            >
+                <span>⌁</span>
+                Analytics
+            </button>
+
+
+            <button
+                class="sidebar-item"
+                id="settingsBtn"
+                type="button"
+            >
+                <span>⚙</span>
+                Settings
+            </button>
+
+
+            <div class="status">
+
+                <span class="status-dot"></span>
+
+                <span>
+                    NOVA is online
+                </span>
+
+            </div>
+
+        </div>
+
+    </aside>
+
+
+
+    <!-- =====================================================
+         MAIN
+    ====================================================== -->
+
+    <main class="main">
+
+
+        <!-- =================================================
+             TOP BAR
+        ================================================== -->
+
+        <header class="topbar">
+
+            <div class="mobile-brand">
+
+                <span>✦</span>
+                NOVA
+
+            </div>
+
+
+            <div class="topbar-actions">
+
+                <button
+                    class="icon-btn"
+                    id="searchBtn"
+                    type="button"
+                    title="Search"
+                    aria-label="Search"
+                >
+                    ⌕
+                </button>
+
+
+                <button
+                    class="icon-btn theme-btn"
+                    id="themeBtn"
+                    type="button"
+                    title="Toggle theme"
+                    aria-label="Toggle theme"
+                >
+                    ☾
+                </button>
+
+
+                <button
+                    class="profile-btn"
+                    type="button"
+                    title="Profile"
+                    aria-label="Profile"
+                >
+                    S
+                </button>
+
+            </div>
+
+        </header>
+
+
+
+        <!-- =================================================
+             CHAT AREA
+        ================================================== -->
+
+        <section class="chat-container">
+
+
+            <!-- =============================================
+                 WELCOME
+            ============================================== -->
+
+            <div
+                class="welcome-screen"
+                id="welcomeScreen"
+            >
+
+                <div class="welcome-icon">
+                    ✦
+                </div>
+
+
+                <p class="eyebrow">
+                    YOUR INTELLIGENT ASSISTANT
+                </p>
+
+
+                <h2>
+                    What can I help you<br>
+                    <span>explore today?</span>
+                </h2>
+
+
+                <p class="welcome-description">
+                    Ask questions, analyse ideas, solve problems,
+                    or simply have a conversation.
+                </p>
+
+
+                <div class="suggestion-grid">
+
+
+                    <button
+                        class="suggestion-card"
+                        type="button"
+                        data-prompt="Explain a difficult concept to me in a simple way."
+                    >
+
+                        <span>◈</span>
+
+                        <strong>
+                            Explain something
+                        </strong>
+
+                        <small>
+                            Make a difficult concept simple
+                        </small>
+
+                    </button>
+
+
+
+                    <button
+                        class="suggestion-card"
+                        type="button"
+                        data-prompt="Help me analyse an idea and identify its strengths and weaknesses."
+                    >
+
+                        <span>⌁</span>
+
+                        <strong>
+                            Analyse an idea
+                        </strong>
+
+                        <small>
+                            Break down a problem
+                        </small>
+
+                    </button>
+
+
+
+                    <button
+                        class="suggestion-card"
+                        type="button"
+                        data-prompt="Help me brainstorm some creative ideas."
+                    >
+
+                        <span>✧</span>
+
+                        <strong>
+                            Brainstorm
+                        </strong>
+
+                        <small>
+                            Explore new possibilities
+                        </small>
+
+                    </button>
+
+
+
+                    <button
+                        class="suggestion-card"
+                        type="button"
+                        data-prompt="Help me plan something step by step."
+                    >
+
+                        <span>◇</span>
+
+                        <strong>
+                            Make a plan
+                        </strong>
+
+                        <small>
+                            Turn an idea into action
+                        </small>
+
+                    </button>
+
+                </div>
+
+            </div>
+
+
+
+            <!-- =============================================
+                 MESSAGES
+            ============================================== -->
+
+            <div
+                class="messages"
+                id="messages"
+            ></div>
+
+
+
+            <!-- =============================================
+                 TYPING INDICATOR
+            ============================================== -->
+
+            <div
+                class="typing-indicator hidden"
+                id="typingIndicator"
+            >
+
+                <div class="nova-avatar">
+                    ✦
+                </div>
+
+                <div class="typing-content">
+
+                    <span></span>
+                    <span></span>
+                    <span></span>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+
+        <!-- =================================================
+             INPUT / COMPOSER
+        ================================================== -->
+
+        <footer class="composer-area">
+
+            <div class="composer-wrapper">
+
+
+                <div class="composer">
+
+
+                    <!-- ATTACHMENT -->
+                    <button
+                        class="attach-btn"
+                        type="button"
+                        title="Coming soon"
+                        aria-label="Attachment"
+                    >
+                        ＋
+                    </button>
+
+
+
+                    <!-- TEXT INPUT -->
+                    <textarea
+                        id="messageInput"
+                        rows="1"
+                        maxlength="4000"
+                        placeholder="Message NOVA..."
+                    ></textarea>
+
+
+
+                    <!-- =================================================
+                         PUSH TO TALK BUTTON
+                    ================================================== -->
+
+                    <button
+                        class="voice-btn"
+                        id="voiceBtn"
+                        type="button"
+                        title="Hold to speak"
+                        aria-label="Hold to speak"
+                    >
+                        🎙
+                    </button>
+
+
+
+                    <!-- SEND -->
+                    <button
+                        class="send-btn"
+                        id="sendBtn"
+                        type="button"
+                        title="Send"
+                        aria-label="Send message"
+                    >
+                        ↑
+                    </button>
+
+                </div>
+
+
+
+                <div class="composer-meta">
+
+                    <span>
+                        NOVA can make mistakes.
+                        Verify important information.
+                    </span>
+
+                    <span>
+                        <kbd>Enter</kbd>
+                        to send
+                    </span>
+
+                </div>
+
+            </div>
+
+        </footer>
+
+    </main>
+
+</div>
+
+
+
+<!-- =========================================================
+     SETTINGS MODAL
+========================================================= -->
+
+<div
+    class="modal-overlay hidden"
+    id="settingsModal"
+>
+
+    <div class="modal">
+
+
+        <div class="modal-header">
+
+            <div>
+
+                <span class="modal-eyebrow">
+                    PREFERENCES
+                </span>
+
+                <h3>
+                    Settings
+                </h3>
+
+            </div>
+
+
+            <button
+                class="close-btn"
+                id="closeSettings"
+                type="button"
+                aria-label="Close settings"
+            >
+                ×
+            </button>
+
+        </div>
+
+
+
+        <!-- MEMORY -->
+
+        <div class="setting-row">
+
+            <div>
+
+                <strong>
+                    Conversation memory
+                </strong>
+
+                <small>
+                    Allow NOVA to remember the current conversation.
+                </small>
+
+            </div>
+
+
+            <label class="switch">
+
+                <input
+                    type="checkbox"
+                    id="memoryToggle"
+                    checked
+                >
+
+                <span></span>
+
+            </label>
+
+        </div>
+
+
+
+        <!-- ANALYSIS -->
+
+        <div class="setting-row">
+
+            <div>
+
+                <strong>
+                    Show AI analysis
+                </strong>
+
+                <small>
+                    Display intent and sentiment information when available.
+                </small>
+
+            </div>
+
+
+            <label class="switch">
+
+                <input
+                    type="checkbox"
+                    id="analysisToggle"
+                    checked
+                >
+
+                <span></span>
+
+            </label>
+
+        </div>
+
+
+    </div>
+
+</div>
+
+
+
+<!-- =========================================================
+     JAVASCRIPT
+========================================================= -->
+
+<script
+    src="{{ url_for('static', filename='js/app.js') }}"
+></script>
+
+
+</body>
+
+</html>
